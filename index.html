@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#080808">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zizi Voile">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
 <title>Zizi Voile | Boutique</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -65,6 +72,7 @@ dialog h2{margin-top:0}
   <div class="searchrow">
     <input id="search" type="search" placeholder="Rechercher un produit…" aria-label="Rechercher un produit">
     <button class="cat" id="addBtn" type="button" onclick="openAdmin()" hidden>+ Ajouter un produit</button>
+    <button class="cat" id="installBtn" type="button" onclick="installApp()">Installer l’application</button>
     <button class="goldbtn" onclick="openCart()">Panier <span id="count">0</span></button>
     <button class="cat" id="adminBtn" type="button" onclick="openOrdersAdmin()">🔒</button>
   </div>
@@ -354,5 +362,39 @@ async function setOrderStatus(id,status){
 
 $("search").addEventListener("input",render);
 updateCart();updatePaymentInfo();loadProducts();initAuth();
+/* ---------- Installation Android / iPhone ---------- */
+let deferredInstallPrompt=null;
+const installButton=document.getElementById("installBtn");
+window.addEventListener("beforeinstallprompt",(event)=>{
+  event.preventDefault();
+  deferredInstallPrompt=event;
+  installButton.hidden=false;
+  installButton.textContent="Installer l’application";
+});
+window.addEventListener("appinstalled",()=>{
+  deferredInstallPrompt=null;
+  installButton.textContent="Application installée ✓";
+  installButton.disabled=true;
+});
+async function installApp(){
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt=null;
+    return;
+  }
+  const ua=navigator.userAgent||"";
+  const isIOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  if(isIOS){
+    alert("Pour installer Zizi Voile sur iPhone : ouvrez ce site dans Safari, appuyez sur le bouton Partager, puis choisissez « Sur l’écran d’accueil » et appuyez sur Ajouter.");
+  }else if(window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone){
+    alert("Zizi Voile est déjà installé sur cet appareil.");
+  }else{
+    alert("Pour installer Zizi Voile : ouvrez le site dans Chrome (Android), puis choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil » dans le menu du navigateur.");
+  }
+}
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(err=>console.warn("Service worker non enregistré",err)));
+}
 </script>
 </body></html>
