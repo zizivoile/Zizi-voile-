@@ -1,0 +1,9 @@
+{
+  "name": "Zizi Voile",
+  "short_name": "Zizi Voile",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "description": "Zizi Voile - Boutique de voiles"
+}
