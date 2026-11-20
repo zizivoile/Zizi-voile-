@@ -58,6 +58,16 @@ dialog h2{margin-top:0}
 .proof-preview{width:100%;max-height:260px;object-fit:contain;background:#090909;border-radius:10px;margin-top:10px}
 .proof-status{color:var(--gold2);font-size:13px;margin-top:8px}
 .banner{background:#3a1c0b;color:#ffd9a0;padding:10px 14px;font-size:13px;text-align:center}
+
+.langbar{display:flex;justify-content:flex-end;max-width:1100px;margin:0 auto;padding:10px 16px 0}
+.trackbox{border:1px solid var(--line);border-radius:16px;padding:16px;margin:18px 0;background:#111}
+.trackbox h2{margin-top:0}
+.trackresult{border-top:1px solid #493817;margin-top:12px;padding-top:12px;line-height:1.8}
+.tracksteps{display:grid;gap:8px;margin:12px 0}
+.trackstep{padding:10px;border:1px solid #493817;border-radius:10px;color:#bdb6a8}
+.trackstep.current{border-color:var(--gold);color:var(--gold2);background:#241b0d}
+[dir=rtl] body,[dir=rtl] input,[dir=rtl] select{font-family:Arial,Tahoma,sans-serif}
+[dir=rtl] .cartline,[dir=rtl] .trackresult{text-align:right}
 @media(min-width:700px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.photo{height:190px}}
 </style>
 </head>
@@ -66,8 +76,9 @@ dialog h2{margin-top:0}
 <header>
   <div class="brand">Zizi Voile</div>
   <div class="sub">BEAUTY</div>
-  <p class="tag">Beauté • Soins • Élégance</p>
+  <p class="tag" data-fr="Beauté • Soins • Élégance" data-ar="الجمال • العناية • الأناقة">Beauté • Soins • Élégance</p>
 </header>
+<div class="langbar"><button class="cat" id="langBtn" type="button" onclick="toggleLanguage()">العربية</button></div>
 <main class="wrap">
   <div class="searchrow">
     <input id="search" type="search" placeholder="Rechercher un produit…" aria-label="Rechercher un produit">
@@ -77,6 +88,14 @@ dialog h2{margin-top:0}
     <button class="cat" id="adminBtn" type="button" onclick="openOrdersAdmin()">🔒</button>
   </div>
   <nav class="categories" id="categories"></nav>
+  <section class="trackbox">
+    <h2 data-fr="Suivre ma commande" data-ar="تتبع طلبي">Suivre ma commande</h2>
+    <p class="small" data-fr="Saisissez le numéro de commande et le code privé reçus après votre achat." data-ar="أدخل رقم الطلب والرمز السري اللذين وصلاك بعد الشراء.">Saisissez le numéro de commande et le code privé reçus après votre achat.</p>
+    <input class="field" id="trackOrderId" placeholder="Numéro de commande (ex. ZV-…)" autocomplete="off">
+    <input class="field" id="trackToken" placeholder="Code privé de suivi" autocomplete="off">
+    <button class="goldbtn" style="width:100%" type="button" onclick="trackOrder()" data-fr="Voir le statut" data-ar="عرض حالة الطلب">Voir le statut</button>
+    <div id="trackResult" class="trackresult" hidden aria-live="polite"></div>
+  </section>
   <h2 id="sectionTitle">Nos produits</h2>
   <section class="grid" id="products"></section>
   <div class="empty" id="empty" hidden>Aucun produit trouvé. Essaie une autre recherche.</div>
@@ -120,7 +139,7 @@ dialog h2{margin-top:0}
   <input class="field" id="customer" placeholder="Votre nom">
   <input class="field" id="city" placeholder="Votre ville">
   <select class="field" id="payment" onchange="updatePaymentInfo()">
-    <option>Bankily</option><option>Masrvi</option><option>Paiement à la livraison</option>
+    <option>Bankily</option><option>Masrvi</option><option value="Paiement à la livraison">Paiement à la livraison</option>
   </select>
   <div id="paymentInfo" class="small" style="border:1px solid #6f5425;border-radius:12px;padding:12px;margin:10px 0"></div>
   <div class="payment-proof">
@@ -165,6 +184,34 @@ const DEMO=[
 const configured=SUPABASE_URL.startsWith("https://")&&window.supabase;
 const sb=configured?supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
 let products=[],cart={},active="Tous",isAdmin=false,selectedPhoto=null,selectedProof=null;
+let language=localStorage.getItem("zv-language")==="ar"?"ar":"fr";
+const translations={
+"Mode démo : la boutique n'est pas encore connectée à Supabase (voir les clés en haut du script).":"وضع تجريبي: المتجر غير متصل بقاعدة البيانات بعد.",
+"Rechercher un produit…":"ابحث عن منتج…","Installer l’application":"تثبيت التطبيق","Panier":"السلة","Nos produits":"منتجاتنا",
+"Aucun produit trouvé. Essaie une autre recherche.":"لم يتم العثور على منتجات. جرّب بحثاً آخر.",
+"Voir mon panier":"عرض سلتي","Commande par WhatsApp · Paiement à confirmer avec la boutique":"الطلب عبر واتساب · يتم تأكيد الدفع مع المتجر",
+"Connexion administrateur":"دخول المسؤول","Email":"البريد الإلكتروني","Mot de passe":"كلمة المرور","Se connecter":"تسجيل الدخول","Annuler":"إلغاء",
+"Ajouter un produit":"إضافة منتج","Le produit sera visible par tous les clients dès la publication.":"سيظهر المنتج لجميع العملاء بعد النشر.",
+"Photo du produit":"صورة المنتج","Nom du produit":"اسم المنتج","Catégorie (ex. Maquillage)":"الفئة (مثال: مكياج)","Description (facultatif)":"الوصف (اختياري)",
+"Prix en MRU":"السعر بالأوقية","Publier le produit":"نشر المنتج","Mon panier":"سلتي","Votre panier est vide.":"سلتك فارغة.",
+"Votre nom":"اسمك","Votre ville":"مدينتك","Preuve de paiement":"إثبات الدفع","Après le paiement, ajoutez ici la capture d'écran de votre transaction.":"بعد الدفع، أرفق هنا صورة المعاملة.",
+"Valider ma commande":"تأكيد طلبي","Continuer mes achats":"متابعة التسوق","Paiement à la livraison":"الدفع عند الاستلام",
+"Capture sélectionnée ✓":"تم اختيار الصورة ✓","Statut de commande":"حالة الطلب","Administration — Zizi Voile":"إدارة زيزي فوال",
+"Fermer":"إغلاق","Se déconnecter":"تسجيل الخروج","Tous":"الكل","Ajouter au panier":"أضف إلى السلة",
+"article(s)":"منتج(ات)","Total : ":"المجموع: ","Votre panier est vide.":"سلتك فارغة.",
+"En attente":"قيد الانتظار","Paiement confirmé":"تم تأكيد الدفع","Préparation":"قيد التجهيز","En livraison":"قيد التوصيل","Livrée":"تم التسليم","Annulée":"ملغاة"
+};
+function tr(s){return language==="ar"?(translations[s]||s):s}
+function applyLanguage(){
+  document.documentElement.lang=language;document.documentElement.dir=language==="ar"?"rtl":"ltr";
+  $("langBtn").textContent=language==="ar"?"Français":"العربية";
+  document.querySelectorAll("[data-fr][data-ar]").forEach(el=>{el.textContent=el.getAttribute("data-"+language)});
+  document.querySelectorAll("input[placeholder]").forEach(el=>{if(!el.dataset.frPlaceholder)el.dataset.frPlaceholder=el.placeholder;el.placeholder=language==="ar"?(translations[el.dataset.frPlaceholder]||el.dataset.frPlaceholder):el.dataset.frPlaceholder});
+  document.querySelectorAll("button").forEach(b=>{if(!b.dataset.frText)b.dataset.frText=b.textContent.trim();const v=b.dataset.frText;if(language==="ar"&&translations[v])b.textContent=translations[v];else if(language==="fr")b.textContent=v});
+  $("sectionTitle").textContent=tr("Nos produits");
+}
+function toggleLanguage(){language=language==="fr"?"ar":"fr";localStorage.setItem("zv-language",language);applyLanguage();renderCategories();render();updateCart();updatePaymentInfo()}
+
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
@@ -197,7 +244,7 @@ function renderCategories(){
   const cats=["Tous",...new Set(products.map(p=>p.category))];
   if(!cats.includes(active))active="Tous";
   cats.forEach(c=>{
-    const b=document.createElement("button");b.className="cat"+(c===active?" active":"");b.textContent=c;
+    const b=document.createElement("button");b.className="cat"+(c===active?" active":"");b.textContent=tr(c);
     b.onclick=()=>{active=c;renderCategories();render()};root.appendChild(b);
   });
 }
@@ -216,7 +263,7 @@ function render(){
   const root=$("products");root.innerHTML="";
   list.forEach(p=>{
     const el=document.createElement("article");el.className="product";
-    el.innerHTML=`<div class="photo">${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}" style="width:100%;height:100%;object-fit:contain" onclick="openProductImage(this.src, this.alt)">`:esc(p.symbol)}</div><div class="info"><div class="name">${esc(p.name)}</div><div class="desc">${esc(p.desc)}</div><div class="price">${p.price.toLocaleString("fr-FR")} MRU</div><button class="goldbtn add" onclick="add(${p.id})">Ajouter au panier</button>${isAdmin?`<button class="del" onclick="deleteProduct(${p.id})">Supprimer</button>`:""}</div>`;
+    el.innerHTML=`<div class="photo">${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}" style="width:100%;height:100%;object-fit:contain" onclick="openProductImage(this.src, this.alt)">`:esc(p.symbol)}</div><div class="info"><div class="name">${esc(p.name)}</div><div class="desc">${esc(p.desc)}</div><div class="price">${p.price.toLocaleString("fr-FR")} MRU</div><button class="goldbtn add" onclick="add(${p.id})">${tr("Ajouter au panier")}</button>${isAdmin?`<button class="del" onclick="deleteProduct(${p.id})">Supprimer</button>`:""}</div>`;
     root.appendChild(el);
   });
   $("empty").hidden=list.length>0;
@@ -281,7 +328,7 @@ function add(id){cart[id]=(cart[id]||0)+1;updateCart()}
 function change(id,n){cart[id]=(cart[id]||0)+n;if(cart[id]<=0)delete cart[id];updateCart();openCart()}
 function total(){return Object.entries(cart).reduce((s,[id,n])=>{const p=products.find(x=>x.id==id);return s+(p?p.price*n:0)},0)}
 function quantity(){return Object.values(cart).reduce((a,b)=>a+b,0)}
-function updateCart(){$("count").textContent=quantity();$("cartCount").textContent=quantity()+" article(s)";$("cartTotal").textContent="Total : "+total().toLocaleString("fr-FR")+" MRU"}
+function updateCart(){$("count").textContent=quantity();$("cartCount").textContent=quantity()+" "+tr("article(s)");$("cartTotal").textContent=tr("Total : ")+total().toLocaleString("fr-FR")+" MRU"}
 function openCart(){
   const root=$("cartItems");root.innerHTML="";
   if(!quantity())root.innerHTML='<p class="small">Votre panier est vide.</p>';
@@ -291,7 +338,7 @@ function openCart(){
     line.innerHTML=`<span>${esc(p.name)}<br><span class="small">${p.price} MRU × ${n}</span></span><span><button class="cat" onclick="change(${id},-1)">−</button> ${n} <button class="cat" onclick="change(${id},1)">+</button></span>`;
     root.appendChild(line);
   });
-  $("dialogTotal").textContent="Total : "+total().toLocaleString("fr-FR")+" MRU";
+  $("dialogTotal").textContent=tr("Total : ")+total().toLocaleString("fr-FR")+" MRU";
   const d=$("cartDialog");if(!d.open)d.showModal();
 }
 function closeCart(){$("cartDialog").close()}
@@ -319,6 +366,8 @@ async function sendOrder(){
   if(method!=="Paiement à la livraison"&&!selectedProof){alert("Ajoutez la capture d'écran de votre paiement avant de valider.");return}
   const items=Object.entries(cart).map(([id,n])=>{const p=products.find(x=>x.id==id);return {name:p.name,quantity:n,price:p.price,image:p.image||""}});
   const orderId="ZV-"+Date.now();
+  const trackingToken=randomTrackingToken();
+  const tokenHash=await sha256Hex(trackingToken);
   const btn=$("orderBtn");btn.disabled=true;btn.textContent="Envoi…";
   try{
     if(sb){
@@ -328,15 +377,59 @@ async function sendOrder(){
         const {error:e1}=await sb.storage.from("proofs").upload(proof_path,selectedProof,{contentType:"image/jpeg"});
         if(e1)throw e1;
       }
-      const {error}=await sb.from("orders").insert({id:orderId,name,city,method,total:total(),items,proof_path});
+      const {error}=await sb.from("orders").insert({id:orderId,name,city,method,total:total(),items,proof_path,status:"En attente",tracking_token_hash:tokenHash});
       if(error)throw error;
     }
     const lines=items.map(i=>`${i.name} x${i.quantity} — ${i.price*i.quantity} MRU`).join("\n");
-    const msg=`Bonjour Zizi Voile,\nCommande ${orderId} :\n${lines}\nTotal : ${total()} MRU\nNom : ${name}\nVille : ${city}\nPaiement : ${method}`+(selectedProof?"\nLa capture de paiement a été envoyée sur le site.":"");
+    const msg=`Bonjour Zizi Voile,\nCommande ${orderId} :\n${lines}\nTotal : ${total()} MRU\nNom : ${name}\nVille : ${city}\nPaiement : ${method}\nCode privé de suivi : ${trackingToken}\nSuivi : https://zizivoile.github.io/Zizi-voile-/`+(selectedProof?"\nLa capture de paiement a été envoyée sur le site.":"");
     cart={};selectedProof=null;updateCart();closeCart();
+    $("trackOrderId").value=orderId;$("trackToken").value=trackingToken;
+    alert((language==="ar"?"تم تسجيل طلبك! احتفظ برقم الطلب والرمز السري لتتبع طلبك.\\nرقم الطلب: ":"Votre commande est enregistrée ! Gardez le numéro et le code privé pour suivre votre commande.\\nCommande : ")+orderId+"\\n"+(language==="ar"?"الرمز السري: ":"Code privé : ")+trackingToken);
     window.location.href="https://wa.me/22232840058?text="+encodeURIComponent(msg);
   }catch(e){alert("Erreur lors de l'envoi de la commande : "+e.message)}
   finally{btn.disabled=false;btn.textContent="Valider ma commande"}
+}
+
+
+/* ---------- Suivi privé des commandes ---------- */
+function randomTrackingToken(){
+  const bytes=new Uint8Array(18);crypto.getRandomValues(bytes);
+  return Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("").toUpperCase();
+}
+async function sha256Hex(value){
+  const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,"0")).join("");
+}
+const statusLabels={
+"En attente":["Commande reçue","تم استلام الطلب"],
+"Paiement confirmé":["Paiement confirmé","تم تأكيد الدفع"],
+"Préparation":["En préparation","قيد التجهيز"],
+"En livraison":["En livraison","قيد التوصيل"],
+"Livrée":["Livrée","تم التسليم"],
+"Annulée":["Commande annulée","تم إلغاء الطلب"]
+};
+async function trackOrder(){
+  const id=$("trackOrderId").value.trim(),token=$("trackToken").value.trim().toUpperCase(),root=$("trackResult");
+  if(!id||!token){alert(language==="ar"?"أدخل رقم الطلب والرمز السري.":"Saisissez le numéro de commande et le code privé.");return}
+  if(!sb){alert(language==="ar"?"التتبع غير متاح في وضع العرض التجريبي.":"Le suivi nécessite la connexion Supabase.");return}
+  root.hidden=false;root.textContent=language==="ar"?"جارٍ البحث…":"Recherche…";
+  try{
+    const {data,error}=await sb.rpc("zv_track_order",{p_order_id:id,p_token:token});
+    if(error)throw error;
+    if(!data||data.error){root.textContent=language==="ar"?"لم يتم العثور على الطلب. تحقق من المعلومات.":"Commande introuvable. Vérifiez les informations.";return}
+    const label=(statusLabels[data.status]||[data.status,data.status])[language==="ar"?1:0];
+    const steps=["En attente","Paiement confirmé","Préparation","En livraison","Livrée"];
+    const current=steps.indexOf(data.status);
+    const list=steps.map((s,i)=>`<div class="trackstep ${i<=current?"current":""}">${i<=current?"✓ ":""}${(statusLabels[s]||[s,s])[language==="ar"?1:0]}</div>`).join("");
+    root.innerHTML=`<strong>${language==="ar"?"رقم الطلب":"Commande"} : ${esc(data.id)}</strong><br><strong>${language==="ar"?"الحالة":"Statut"} : ${esc(label)}</strong><div class="tracksteps">${list}</div><p>${language==="ar"?"المجموع":"Total"} : ${Number(data.total).toLocaleString("fr-FR")} MRU</p>${data.status==="En livraison"||data.status==="Préparation"||data.status==="Paiement confirmé"?`<p>${language==="ar"?"طلبك قيد المعالجة. يمكنك العودة لاحقاً لمعرفة التحديثات.":"Votre commande avance. Revenez plus tard pour voir les mises à jour."}</p>`:""}${data.status!=="Livrée"&&data.status!=="Annulée"?`<button class="goldbtn" type="button" onclick="confirmReceived('${esc(data.id)}','${token}')">${language==="ar"?"استلمت طلبي":"J’ai reçu ma commande"}</button>`:""}${data.status==="Livrée"?`<p>${language==="ar"?"شكراً لثقتكم بزيزي فوال!":"Merci pour votre confiance chez Zizi Voile !"}</p>`:""}`;
+  }catch(e){root.textContent=(language==="ar"?"تعذر تتبع الطلب: ":"Impossible de suivre la commande : ")+e.message}
+}
+async function confirmReceived(id,token){
+  if(!confirm(language==="ar"?"هل تؤكد أنك استلمت طلبك؟":"Confirmez-vous avoir reçu votre commande ?"))return;
+  const {data,error}=await sb.rpc("zv_confirm_received",{p_order_id:id,p_token:token});
+  if(error||!data||data.error){alert(language==="ar"?"تعذر تأكيد الاستلام.":"Impossible de confirmer la réception.");return}
+  alert(language==="ar"?"شكراً! تم تأكيد استلام طلبك.":"Merci ! La réception de votre commande est confirmée.");
+  trackOrder();
 }
 
 /* ---------- Admin : commandes ---------- */
@@ -352,7 +445,7 @@ async function renderAdminOrders(){
   if(error){root.innerHTML='<p class="empty">Erreur : '+esc(error.message)+'</p>';return}
   if(!data.length){root.innerHTML='<p class="empty">Aucune commande pour le moment.</p>';return}
   const urls=await Promise.all(data.map(async o=>o.proof_path?(await sb.storage.from("proofs").createSignedUrl(o.proof_path,3600)).data?.signedUrl:null));
-  const statuses=["En attente","Paiement confirmé","Préparation","Livrée","Annulée"];
+  const statuses=["En attente","Paiement confirmé","Préparation","En livraison","Livrée","Annulée"];
   root.innerHTML=data.map((o,i)=>`<article style="border:1px solid #6f5425;border-radius:14px;padding:14px;margin:12px 0;background:#15120d"><h3 style="color:#f6d98b;margin:0 0 8px">${esc(o.id)} — ${esc(o.status)}</h3><p>Cliente : ${esc(o.name)}<br>Ville : ${esc(o.city)}<br>Paiement : ${esc(o.method)}<br>Total : ${Number(o.total).toLocaleString("fr-FR")} MRU<br>Date : ${new Date(o.created_at).toLocaleString("fr-FR")}</p><div style="display:grid;gap:10px;margin:12px 0">${(o.items||[]).map(it=>`<div style="display:flex;align-items:center;gap:12px;padding:8px;border:1px solid #493817;border-radius:10px"><div style="width:76px;height:76px;flex:0 0 76px;background:#080808;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden">${it.image?`<img src="${esc(it.image)}" alt="${esc(it.name)}" style="width:100%;height:100%;object-fit:contain">`:'<span style="color:#aaa;font-size:11px">Sans photo</span>'}</div><div>${esc(it.name)}<br><span class="small">Quantité : ${it.quantity} · ${Number(it.price).toLocaleString("fr-FR")} MRU l’unité</span><br><strong style="color:#f6d98b">${(it.price*it.quantity).toLocaleString("fr-FR")} MRU</strong></div></div>`).join("")}</div>${urls[i]?`<p style="color:#f6d98b">Capture de paiement :</p><img src="${esc(urls[i])}" alt="Capture de paiement" style="width:100%;max-height:320px;object-fit:contain;background:#080808;border-radius:10px">`:'<p class="small">Pas de capture jointe.</p>'}<label class="small">Statut de commande</label><select onchange="setOrderStatus('${esc(o.id)}',this.value)" style="width:100%;margin-top:8px">${statuses.map(s=>`<option ${o.status===s?"selected":""}>${s}</option>`).join("")}</select></article>`).join("");
 }
 async function setOrderStatus(id,status){
@@ -361,7 +454,7 @@ async function setOrderStatus(id,status){
 }
 
 $("search").addEventListener("input",render);
-updateCart();updatePaymentInfo();loadProducts();initAuth();
+updateCart();updatePaymentInfo();applyLanguage();loadProducts();initAuth();
 /* ---------- Installation Android / iPhone ---------- */
 let deferredInstallPrompt=null;
 const installButton=document.getElementById("installBtn");
